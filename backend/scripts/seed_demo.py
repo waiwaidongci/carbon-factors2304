@@ -4,6 +4,7 @@ from src.config.settings import CONFIG
 from src.models.identity import User
 from src.models.source import Source,Policy,Period
 from src.models import run
+from src.models.evaluation import Department, DepartmentOutput
 from src.utils.security import password_hash
 from src.services.validation import validate_source
 
@@ -12,6 +13,14 @@ def demo_rows():
  for i in range(240):
   activity=['电力','柴油','通勤'][i%3];unit={'电力':'kWh','柴油':'L','通勤':'km'}[activity];rows.append({'period':'2026-'+('10' if i<120 else '11'),'department':['材料试验室','工艺试验室','光学试验室'][i%3],'activity':activity,'quantity':round(rng.uniform(2,300),3),'unit':unit})
  return rows
+
+def seed_department_outputs(db):
+ outputs={'材料试验室':{'2026-10':1200.0,'2026-11':1180.0},'工艺试验室':{'2026-10':1100.0,'2026-11':1150.0},'光学试验室':{'2026-10':980.0,'2026-11':1000.0}}
+ retrofit={'材料试验室':True,'工艺试验室':False,'光学试验室':False}
+ for name,by_period in outputs.items():
+  if not db.query(Department).filter_by(name=name).first():db.add(Department(name=name,retrofit=retrofit[name],created=0.0))
+  for period,output in by_period.items():
+   if not db.query(DepartmentOutput).filter_by(department=name,period=period).first():db.add(DepartmentOutput(department=name,period=period,output=output,created=0.0))
 
 def seed():
  Base.metadata.create_all(engine)
@@ -25,5 +34,6 @@ def seed():
    validate_source(data);key='demo-'+str(i+1)
    if not db.query(Source).filter_by(natural_key=key).first():db.add(Source(natural_key=key,data=data))
   if not db.query(Policy).filter_by(version=CONFIG['policy']['version']).first():db.add(Policy(version=CONFIG['policy']['version'],data=CONFIG['policy']))
+  seed_department_outputs(db)
   db.commit();print(json.dumps({'users':db.query(User).count(),'sources':db.query(Source).count(),'policies':db.query(Policy).count(),'periods':db.query(Period).count()},ensure_ascii=False))
 if __name__=='__main__':seed()

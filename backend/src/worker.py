@@ -7,6 +7,7 @@ from src.models import identity,source,run
 from src.models.run import Run
 from src.services.calculation import calculate
 from src.services.delivery import tick
+from src.services.evaluation import process as process_evaluation
 Base.metadata.create_all(engine)
 r=redis.Redis.from_url(REDIS_URL)
 while True:
@@ -21,6 +22,11 @@ while True:
      try: job.result=calculate(job.snapshot['sources'],job.snapshot['policy']);job.status='completed'
      except Exception as exc: job.status='failed';job.error=str(exc);traceback.print_exc()
      db.commit()
+  item=r.lpop('evaluation-jobs')
+  if item:
+   with Session() as db:
+    try: process_evaluation(db,int(item))
+    except Exception: traceback.print_exc();db.rollback()
   with Session() as db: tick(db)
  except Exception: traceback.print_exc()
  time.sleep(1)
